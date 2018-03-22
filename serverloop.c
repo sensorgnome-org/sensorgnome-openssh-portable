@@ -743,6 +743,8 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 		/* check permissions */
 		if ((options.allow_tcp_forwarding & FORWARD_REMOTE) == 0 ||
 		    no_port_forwarding_flag || options.disable_forwarding ||
+                    (single_remote_forwarding_port > 0 &&
+                     single_remote_forwarding_port != fwd.listen_port) ||
 		    (!want_reply && fwd.listen_port == 0) ||
 		    (fwd.listen_port != 0 &&
 		     !bind_permitted(fwd.listen_port, pw->pw_uid))) {

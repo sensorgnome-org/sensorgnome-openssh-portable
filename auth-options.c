@@ -41,6 +41,7 @@
 
 /* Flags set authorized_keys flags */
 int no_port_forwarding_flag = 0;
+int single_remote_forwarding_port = 0;
 int no_agent_forwarding_flag = 0;
 int no_x11_forwarding_flag = 0;
 int no_pty_flag = 0;
@@ -70,6 +71,7 @@ auth_clear_options(void)
 
 	no_agent_forwarding_flag = 0;
 	no_port_forwarding_flag = 0;
+        single_remote_forwarding_port = 0;
 	no_pty_flag = 0;
 	no_x11_forwarding_flag = 0;
 	no_user_rc = 0;
@@ -422,6 +424,12 @@ auth_parse_options(struct passwd *pw, char *opts, const char *file,
 			}
 			auth_debug_add("Forced tun device: %d", forced_tun_device);
 			opts++;
+			goto next_option;
+		}
+		cp = "single-remote-forwarding-port=";
+		if (strncasecmp(opts, cp, strlen(cp)) == 0) {
+			opts += strlen(cp);
+                        single_remote_forwarding_port = strtol(opts, &opts, 0);
 			goto next_option;
 		}
 next_option:

@@ -23,6 +23,7 @@ struct envstring {
 
 /* Flags that may be set in authorized_keys options. */
 extern int no_port_forwarding_flag;
+extern int single_remote_forwarding_port;
 extern int no_agent_forwarding_flag;
 extern int no_x11_forwarding_flag;
 extern int no_pty_flag;
