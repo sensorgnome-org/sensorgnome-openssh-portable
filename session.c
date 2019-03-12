@@ -62,6 +62,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
+#include <semaphore.h>
 
 #include "openbsd-compat/sys-queue.h"
 #include "xmalloc.h"
@@ -170,6 +171,11 @@ static char *auth_info_file = NULL;
 /* Name and directory of socket for authentication agent forwarding. */
 static char *auth_sock_name = NULL;
 static char *auth_sock_dir = NULL;
+
+/* semaphore for connection status */
+static void decr_connection_semaphore();
+static void incr_connection_semaphore();
+static sem_t *connection_sem = NULL;
 
 /* removes the agent forwarding socket */
 
@@ -2635,6 +2641,9 @@ session_setup_x11fwd(struct ssh *ssh, Session *s)
 static void
 do_authenticated2(struct ssh *ssh, Authctxt *authctxt)
 {
+	// needed, as use of ControlMaster and a port mapping
+	// doesn't call begin_session
+	incr_connection_semaphore();
 	server_loop2(ssh, authctxt);
 }
 
@@ -2678,6 +2687,8 @@ do_cleanup(struct ssh *ssh, Authctxt *authctxt)
 		ssh_gssapi_cleanup_creds();
 #endif
 
+	decr_connection_semaphore();
+
 	/* remove agent socket */
 	auth_sock_cleanup_proc(authctxt->pw);
 
@@ -2712,3 +2723,37 @@ session_get_remote_name_or_ip(struct ssh *ssh, u_int utmp_size, int use_dns)
 	return remote;
 }
 
+/* Decrease the connection semaphore for this key */
+
+static void
+decr_connection_semaphore() {
+	if (auth_opts->connection_semname && connection_sem) {
+		debug("got to decr_connection_semaphore for auth_opts->connection_flag_file=%s", auth_opts->connection_semname);
+		sem_trywait(connection_sem);
+		int n;
+		int err = sem_getvalue(connection_sem, &n);
+		debug("sem value is %d and err=%d", n, err);
+		if (err == 0 && n == 0) {
+			sem_close(connection_sem);
+			connection_sem = NULL;
+			sem_unlink(auth_opts->connection_semname);
+		}
+	}
+}
+
+/* Increase the connection semaphore for this key */
+
+static void
+incr_connection_semaphore() {
+	char semname[NAME_MAX+1];
+	if (auth_opts->connection_semname) {
+		debug("got to incr_connection_semaphore for auth_opts->connection_flag_file=%s", auth_opts->connection_semname);
+		if (! connection_sem) {
+			semname[0] = '/';
+			strcpy(& semname[1], auth_opts->connection_semname);
+			connection_sem = sem_open(semname, O_CREAT, S_IRWXU, 0);
+		}
+		debug("calling sem_post");
+		sem_post(connection_sem);
+	}
+}

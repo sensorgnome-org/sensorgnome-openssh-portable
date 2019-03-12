@@ -286,6 +286,7 @@ sshauthopt_free(struct sshauthopt *opts)
 	for (i = 0; i < opts->npermitlisten; i++)
 		free(opts->permitlisten[i]);
 	free(opts->permitlisten);
+	free(opts->connection_semname);
 
 	explicit_bzero(opts, sizeof(*opts));
 	free(opts);
@@ -508,6 +509,14 @@ sshauthopt_parse(const char *opts, const char **errstrp)
 				errstr = "invalid tun device";
 				goto fail;
 			}
+		} else if (opt_match(&opts, "connection-semname")) {
+			if (ret->connection_semname != NULL) {
+				errstr = "multiple \"connection-semname\" clauses";
+				goto fail;
+			}
+			ret->connection_semname = opt_dequote(&opts, &errstr);
+			if (ret->connection_semname == NULL)
+				goto fail;
 		}
 		/*
 		 * Skip the comma, and move to the next option
@@ -677,6 +686,11 @@ sshauthopt_merge(const struct sshauthopt *primary,
 	} else if (additional->force_command != NULL) {
 		if ((ret->force_command = strdup(
 		    additional->force_command)) == NULL)
+			goto alloc_fail;
+	}
+	if (additional->connection_semname) {
+		if ((ret->connection_semname =
+			 strdup(additional->connection_semname)) == NULL)
 			goto alloc_fail;
 	}
 	/* success */

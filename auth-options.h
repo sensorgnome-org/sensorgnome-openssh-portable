@@ -66,6 +66,11 @@ struct sshauthopt {
 	 */
 	char *required_from_host_cert;
 	char *required_from_host_keys;
+
+	/*
+	 * Name of semaphore to track connection status
+	 */
+	char *connection_semname;
 };
 
 struct sshauthopt *sshauthopt_new(void);
