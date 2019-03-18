@@ -81,4 +81,7 @@ void	 do_setusercontext(struct passwd *);
 
 const char	*session_get_remote_name_or_ip(struct ssh *, u_int, int);
 
+void decr_connection_semaphore();
+void incr_connection_semaphore();
+
 #endif

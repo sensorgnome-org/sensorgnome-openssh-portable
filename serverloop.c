@@ -285,6 +285,12 @@ wait_until_can_do_something(struct ssh *ssh,
 		memset(*writesetp, 0, *nallocp);
 		if (errno != EINTR)
 			error("select: %.100s", strerror(errno));
+		else if (received_sigterm) {
+			/* Due to the SIGTERM handler for connection
+			   semaphore logic, we need to exit on signals
+			   received while in select. */
+			return;
+		}
 	} else if (client_alive_scheduled) {
 		time_t now = monotime();
 

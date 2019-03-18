@@ -173,8 +173,6 @@ static char *auth_sock_name = NULL;
 static char *auth_sock_dir = NULL;
 
 /* semaphore for connection status */
-static void decr_connection_semaphore();
-static void incr_connection_semaphore();
 static sem_t *connection_sem = NULL;
 
 /* removes the agent forwarding socket */
@@ -467,7 +465,6 @@ do_exec_no_pty(struct ssh *ssh, Session *s, const char *command)
 		return -1;
 	case 0:
 		is_child = 1;
-
 		/*
 		 * Create a new session and process group since the 4.4BSD
 		 * setlogin() affects the entire process group.
@@ -656,7 +653,7 @@ do_exec_pty(struct ssh *ssh, Session *s, const char *command)
 
 	/* Enter interactive session. */
 	s->ptymaster = ptymaster;
-	packet_set_interactive(1, 
+	packet_set_interactive(1,
 	    options.ip_qos_interactive, options.ip_qos_bulk);
 	session_set_fds(ssh, s, ptyfd, fdout, -1, 1, 1);
 	return 0;
@@ -1357,7 +1354,7 @@ safely_chroot(const char *path, uid_t uid)
 			memcpy(component, path, cp - path);
 			component[cp - path] = '\0';
 		}
-	
+
 		debug3("%s: checking '%s'", __func__, component);
 
 		if (stat(component, &st) != 0)
@@ -1365,7 +1362,7 @@ safely_chroot(const char *path, uid_t uid)
 			    component, strerror(errno));
 		if (st.st_uid != 0 || (st.st_mode & 022) != 0)
 			fatal("bad ownership or modes for chroot "
-			    "directory %s\"%s\"", 
+			    "directory %s\"%s\"",
 			    cp == NULL ? "" : "component ", component);
 		if (!S_ISDIR(st.st_mode))
 			fatal("chroot path %s\"%s\" is not a directory",
@@ -1438,7 +1435,7 @@ do_setusercontext(struct passwd *pw)
 			perror("unable to set user context (setuser)");
 			exit(1);
 		}
-		/* 
+		/*
 		 * FreeBSD's setusercontext() will not apply the user's
 		 * own umask setting unless running with the user's UID.
 		 */
@@ -2643,7 +2640,6 @@ do_authenticated2(struct ssh *ssh, Authctxt *authctxt)
 {
 	// needed, as use of ControlMaster and a port mapping
 	// doesn't call begin_session
-	incr_connection_semaphore();
 	server_loop2(ssh, authctxt);
 }
 
@@ -2687,8 +2683,6 @@ do_cleanup(struct ssh *ssh, Authctxt *authctxt)
 		ssh_gssapi_cleanup_creds();
 #endif
 
-	decr_connection_semaphore();
-
 	/* remove agent socket */
 	auth_sock_cleanup_proc(authctxt->pw);
 
@@ -2725,14 +2719,13 @@ session_get_remote_name_or_ip(struct ssh *ssh, u_int utmp_size, int use_dns)
 
 /* Decrease the connection semaphore for this key */
 
-static void
+void
 decr_connection_semaphore() {
 	if (auth_opts->connection_semname && connection_sem) {
-		debug("got to decr_connection_semaphore for auth_opts->connection_flag_file=%s", auth_opts->connection_semname);
+		debug("sem_trywait on %s", auth_opts->connection_semname);
 		sem_trywait(connection_sem);
 		int n;
 		int err = sem_getvalue(connection_sem, &n);
-		debug("sem value is %d and err=%d", n, err);
 		if (err == 0 && n == 0) {
 			sem_close(connection_sem);
 			connection_sem = NULL;
@@ -2743,17 +2736,16 @@ decr_connection_semaphore() {
 
 /* Increase the connection semaphore for this key */
 
-static void
+void
 incr_connection_semaphore() {
 	char semname[NAME_MAX+1];
 	if (auth_opts->connection_semname) {
-		debug("got to incr_connection_semaphore for auth_opts->connection_flag_file=%s", auth_opts->connection_semname);
 		if (! connection_sem) {
 			semname[0] = '/';
 			strcpy(& semname[1], auth_opts->connection_semname);
 			connection_sem = sem_open(semname, O_CREAT, S_IRWXU, 0);
 		}
-		debug("calling sem_post");
+		debug("sem_post on %s", auth_opts->connection_semname);
 		sem_post(connection_sem);
 	}
 }

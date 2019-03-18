@@ -363,6 +363,23 @@ grace_alarm_handler(int sig)
 	    ssh_remote_ipaddr(active_state), ssh_remote_port(active_state));
 }
 
+/*
+ * Generic signal handler for terminating signals in the child daemon.
+ * Handles semaphore decrement.
+ */
+/*ARGSUSED*/
+static void
+sigterm_handler_child(int sig)
+{
+	decr_connection_semaphore();
+	received_sigterm = sig;
+	/* reset default handler and re-raise the signal in case
+	   process is waiting in select() */
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+
+
 static void
 sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 {
@@ -683,6 +700,10 @@ privsep_postauth(Authctxt *authctxt)
 	 * this information is not part of the key state.
 	 */
 	packet_set_authenticated();
+	incr_connection_semaphore();
+        signal(SIGTERM, sigterm_handler_child);
+        signal(SIGQUIT, sigterm_handler_child);
+	atexit(decr_connection_semaphore);
 }
 
 static void
@@ -2344,6 +2365,7 @@ cleanup_exit(int i)
 				    pmonitor->m_pid, strerror(errno));
 		}
 	}
+	decr_connection_semaphore();
 #ifdef SSH_AUDIT_EVENTS
 	/* done after do_cleanup so it can cancel the PAM auth 'thread' */
 	if (!use_privsep || mm_is_monitor())
